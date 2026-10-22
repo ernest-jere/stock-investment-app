@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  /* Color Palette Tokens */
+  --color-background: #E5E5E5;         /* Light grey canvas background */
+  --color-surface: #4B4B4B;            /* Slate/Dark grey surface elements */
+  --color-surface-second: #3A3A3A;     /* Secondary dark surface */
+  --color-text-surface: #FFFFFF;       /* High contrast white text on dark surfaces */
+  --color-text-muted: #8E8E93;         /* Off-surface subtle text */
+  --color-error: #FF0000;              /* Bright red alert indicator */
+  
+  /* Typography Scale Tokens */
+  --font-size-headline-1: 2rem;
+  --font-size-headline-2: 1.5rem;
+  --font-size-headline-3: 1.25rem;
+  --font-size-body-lg: 1.125rem;
+  --font-size-body-sm: 0.875rem;
+  
+  /* Shadow Tokens */
+  --shadow-key: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
