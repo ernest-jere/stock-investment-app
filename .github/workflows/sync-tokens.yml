@@ -1,0 +1,37 @@
+name: Sync Figma Design Tokens
+
+on:
+  workflow_dispatch: # Allows you to manually trigger this sync with a single click button on GitHub
+  schedule:
+    - cron: '0 0 * * *' # Automated safety backup run every night at midnight
+
+jobs:
+  build-and-sync:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # Grants the action permission to write code back to your main repository branch
+
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js runtime environment
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci || npm install
+
+      - name: Pull and Parse Fresh Tokens
+        run: npm run tokens
+        env:
+          FIGMA_ACCESS_TOKEN: ${{ secrets.FIGMA_ACCESS_TOKEN }}
+          FIGMA_FILE_KEY: ${{ secrets.FIGMA_FILE_KEY }}
+
+      - name: Automatically Commit and Push Styling Adjustments
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: sync latest styling tokens from figma cloud"
+          file_pattern: 'src/index.css tokens.json'
