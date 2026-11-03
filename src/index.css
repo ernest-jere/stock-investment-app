@@ -15,4 +15,6 @@
   --color-semantic-text-body: var(--color-primitive-gray-400);
   --color-semantic-stock-up: var(--color-primitive-green-400);
   --color-semantic-stock-down: var(--color-primitive-red-400);
+  --color-semantic-chart-grid: var(--color-primitive-gray-400);
+  --color-semantic-chart-stroke-width: 2px;
 }

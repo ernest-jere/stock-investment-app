@@ -3,17 +3,17 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
- "scripts": {
-  "dev": "vite",
-  "build": "vite build",
-  "lint": "eslint .",
-  "preview": "vite preview",
-  "tokens": "node parse-tokens.js"
+  "scripts": {
+    "dev": "vite",
+    "tokens": "node parse-tokens.js",
+    "build": "npm run tokens && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "recharts": "^3.10.1",
     "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
