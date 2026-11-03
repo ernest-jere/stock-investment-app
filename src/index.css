@@ -1,28 +1,18 @@
 @import "tailwindcss";
 
 @theme {
-  /* Brand Color Styles mapped from Figma */
-  --color-background: #e5e5e5;
-  --color-surface: #737373;
-  --color-surface-text: #ffffff;
-  --color-off-surface-text: #8c8c8c;
-  --color-error: #ff0000;
-  --color-second-surface: #525252;
-
-  /* Elevation Shadow Styles mapped from Figma */
-  --shadow-umbra: 0 px 4 px 6 px -1 px rgba(0, 0, 0, 0.1);
-  --shadow-penumbra: 0 px 2 px 4 px -1 px rgba(0, 0, 0, 0.06);
-  --shadow-ambient: 0 px 10 px 15 px -3 px rgba(0, 0, 0, 0.1);
-
-  /* Typography Headline/Body Hierarchy mappings */
-  --font-display: "Inter", sans-serif;
-  --text-headline-1: 2.25rem;
-  --text-headline-1--line-height: 2.5rem;
-  --text-headline-1--font-weight: 700;
-  
-  --text-body-large: 1.125rem;
-  --text-body-large--line-height: 1.75rem;
-  
-  --text-body-small: 0.875rem;
-  --text-body-small--line-height: 1.25rem;
+  --color-primitive-slate-950: #020617;
+  --color-primitive-slate-900: #0f172a;
+  --color-primitive-slate-800: #1e293b;
+  --color-primitive-white: #ffffff;
+  --color-primitive-gray-400: #94a3b8;
+  --color-primitive-green-400: #4ade80;
+  --color-primitive-red-400: #f87171;
+  --color-semantic-app-bg: var(--color-primitive-slate-950);
+  --color-semantic-surface-secondary: var(--color-primitive-slate-900);
+  --color-semantic-surface-primary: var(--color-primitive-slate-800);
+  --color-semantic-text-display: var(--color-primitive-white);
+  --color-semantic-text-body: var(--color-primitive-gray-400);
+  --color-semantic-stock-up: var(--color-primitive-green-400);
+  --color-semantic-stock-down: var(--color-primitive-red-400);
 }
