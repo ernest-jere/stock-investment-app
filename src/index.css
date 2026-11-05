@@ -16,5 +16,11 @@
   --color-semantic-stock-up: var(--color-primitive-green-400);
   --color-semantic-stock-down: var(--color-primitive-red-400);
   --color-semantic-chart-grid: var(--color-primitive-gray-400);
-  --color-semantic-chart-stroke-width: 2px;
+  --color-semantic-chart-stroke-width: 2;
+  --font-portfolio: Rubik, sans-serif;
+  --font-weight-bold: 700;
+  --font-weight-regular: 400;
+  --text-headline: 1.75rem;
+  --text-body-large: 1rem;
+  --text-body-small: 0.75rem;
 }

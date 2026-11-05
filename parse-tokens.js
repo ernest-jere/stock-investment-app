@@ -36,7 +36,6 @@ async function fetchFigmaVariables() {
     if (!res.ok) throw new Error(`HTTP status response error: ${res.status}`);
     
     const data = await res.json();
-    // Tokens Studio raw mapping conversion shape fallback configuration
     fs.writeFileSync(TOKENS_PATH, JSON.stringify(data.meta || data, null, 2), 'utf8');
     console.log('✅ Tokens metadata mirrored locally successfully.');
   } catch (err) {
@@ -59,20 +58,34 @@ async function run() {
   for (let [name, val] of Object.entries(cleanVariables)) {
     let cssName = name.toLowerCase().replace(/-+/g, '-');
     if (val && typeof val === 'string') {
+      
+      // Fix alias translation to include exact structural path matching
       if (val.startsWith('{') && val.endsWith('}')) {
         let reference = val.replace(/[\{\}]/g, '').replace(/\./g, '-').toLowerCase();
         val = `var(--color-${reference})`;
       }
+      
       if (/^[0-9A-F]{6,8}$/i.test(val) && !val.startsWith('#')) {
         val = `#${val}`;
       }
-      themeLines.push(`  --color-${cssName}: ${val};`);
+
+      // Handle specific typography allocations while keeping primitives intact
+      if (cssName.includes('font-family')) {
+        themeLines.push(`  --font-portfolio: ${val};`);
+      } else if (cssName.includes('typography-headline') || cssName.includes('typography-body')) {
+        themeLines.push(`  --text-${cssName.replace('typography-', '')}: ${val};`);
+      } else if (cssName.includes('typography-weight')) {
+        themeLines.push(`  --font-weight-${cssName.replace('typography-weight-', '')}: ${val};`);
+      } else {
+        // Generates all standard color properties seamlessly (both semantic & primitive)
+        themeLines.push(`  --color-${cssName}: ${val};`);
+      }
     }
   }
   themeLines.push('}');
 
   fs.writeFileSync(CSS_PATH, `@import "tailwindcss";\n\n${themeLines.join('\n')}\n`, 'utf8');
-  console.log('🚀 Theme compilation completed successfully.');
+  console.log('🚀 Tailwind v4 @theme file written with clean baseline colors!');
 }
 
 run();
