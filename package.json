@@ -4,10 +4,11 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "tokens": "node parse-tokens.js",
-    "build": "npm run tokens && vite build",
-    "preview": "vite preview"
+  "dev": "vite",
+  "tokens": "node parse-tokens.js",
+  "build": "npm run tokens && vite build",
+  "preview": "vite preview",
+  "deploy": "npm run tokens && git add . && git commit -m \"deploy: production rebuild compilation updates\" && git push origin main"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
