@@ -1,5 +1,15 @@
 # 📈 InvestTrack: Production Stock & Crypto App with Figma Token Automation
 
+[![Deployment Status](https://shields.io)](https://stock-investment-app-mrh1.vercel.app/)
+[![Figma System](https://shields.io)](https://www.figma.com/proto/uxlO9aNtkP77XavfqRRIXA/Stock-Ivestiment-App?node-id=42-33&t=LqIozkrYzPgk21RA-1&scaling=scale-down&content-scaling=fixed&page-id=16%3A177&starting-point-node-id=42%3A31)
+
+A production-ready, full-stack reactive financial portfolio dashboard built with **ReactJS**, **Tailwind CSS 4**, and **Vite**. 
+
+**🔗 Live Production URL:** [https://vercel.app](https://stock-investment-app-mrh1.vercel.app/)
+
+---
+
+
 A production-ready, full-stack reactive financial portfolio dashboard built with **ReactJS**, **Tailwind CSS 4**, and **Vite**. This application bridges the gap between design and production by utilizing an automated custom script pipeline that pulls and parses design tokens directly from Figma variables into utility classes.
 
 Live market data is streamed using the **Yahoo Finance API** and **CoinGecko Engine** with automatic calculation fallback states, dual-currency toggles (ZAR/USD), user state local persistence, and native multi-theme variation blocks.
