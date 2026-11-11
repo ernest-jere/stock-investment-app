@@ -16,14 +16,25 @@ export default function StockRow({ symbol, name, shares, price, change, isPositi
 
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-semantic-surface-secondary border border-semantic-surface-primary/40 group relative">
-      <div className="flex items-center gap-3 w-1/3">
-        <div className="w-10 h-10 rounded-full bg-semantic-surface-primary flex items-center justify-center text-semantic-text-display font-bold shrink-0">{symbol.slice(0, 2)}</div>
-        <div className="truncate">
-          <h3 className="font-bold text-semantic-text-display">{symbol}</h3>
-          <p className="text-xs text-semantic-text-body truncate">{name}</p>
-        </div>
+      // inside src/components/StockRow.jsx
+    <div className="flex items-center gap-3 w-1/3">
+      {/* Circle Identity Avatar Badge */}
+      <div className="w-10 h-10 rounded-full bg-semantic-surface-primary flex items-center justify-center text-semantic-text-display font-bold shrink-0">
+        {symbol.slice(0, 2)}
       </div>
-      <div className="flex justify-center w-1/4"><StockSparkline data={history} isPositive={isPositive} /></div>
+      
+      {/* Dynamic Identity Strings */}
+      <div className="truncate">
+        {/* Ticker Indicator */}
+        <h3 className="font-bold text-semantic-text-display text-text-body-large">{symbol}</h3>
+        
+        {/* Full Corporate Name string - renders full live company name here */}
+        <p className="text-text-body-small text-semantic-text-body truncate" title={name}>
+          {name}
+        </p>
+      </div>
+    </div>
+     <div className="flex justify-center w-1/4"><StockSparkline data={history} isPositive={isPositive} /></div>
       <div className="flex items-center justify-end gap-3 w-1/3 text-right">
         <div>
           <p className="font-bold text-semantic-text-display">{formattedPrice}</p>
