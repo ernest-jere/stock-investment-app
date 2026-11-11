@@ -1,23 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import StockRow from '../src/components/StockRow';
-import PortfolioHistoryChart from '../src/components/PortfolioHistoryChart';
-import LoadingSpinner from '../src/components/LoadingSpinner';
-import PortfolioBetaBlock from '../src/components/PortfolioBetaBlock';
+import StockRow from './components/StockRow';
+import PortfolioHistoryChart from './components/PortfolioHistoryChart';
+import LoadingSpinner from './components/LoadingSpinner';
+import PortfolioBetaBlock from './components/PortfolioBetaBlock';
 
 const DEFAULT_STOCKS = [
-  { symbol: 'AAPL', name: 'Apple Inc.', shares: '7', price: '182.30', change: '+1.15%', isPositive: true, history: [180, 181, 182.30] },
-  { symbol: 'TSLA', name: 'Tesla Inc.', shares: '5', price: '214.80', change: '-0.45%', isPositive: false, history: [216, 215, 214.80] },
-  { symbol: 'NVDA', name: 'NVIDIA Corp.', shares: '25.0', price: '122.15', change: '+3.20%', isPositive: true, history: [118, 120, 122.15] }
+  { symbol: 'AAPL', name: 'Apple Inc.', shares: '7', price: '182.30', change: '-1.72%', isPositive: false, history: [182, 181, 183, 179, 180.50] },
+  { symbol: 'TSLA', name: 'Tesla Inc.', shares: '5', price: '215.30', change: '+0.03%', isPositive: true, history: [210, 214, 212, 215, 215.30] },
+  { symbol: 'NVDA', name: 'NVIDIA Corp.', shares: '25.0', price: '123.07', change: '+2.22%', isPositive: true, history: [118, 120, 122, 121, 123.07] }
 ];
 
 export default function App() {
-  // ⚡ AUTOMATED CACHE SHIELD: Forces a clean reset if an old flatlined layout is detected
   const [stocks, setStocks] = useState(() => {
     const saved = localStorage.getItem('user_portfolio_manifest');
-    if (saved && saved.includes('1648')) {
-      localStorage.removeItem('user_portfolio_manifest');
-      return DEFAULT_STOCKS;
-    }
     return saved ? JSON.parse(saved) : DEFAULT_STOCKS;
   });
   
@@ -28,51 +23,52 @@ export default function App() {
   const [inputShares, setInputShares] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const [cryptoCoins, setCryptoCoins] = useState([
-    { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: 1224500, change24h: 1.45 },
-    { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: 35620, change24h: 2.10 },
-    { id: 'solana', name: 'Solana', symbol: 'SOL', priceZAR: 1485, change24h: -0.75 }
-  ]);
-
   const [netWorthHistory, setNetWorthHistory] = useState(() => {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
-    return savedHistory && !savedHistory.includes('1648') ? JSON.parse(savedHistory) : [];
+    return savedHistory ? JSON.parse(savedHistory) : [];
   });
-
-    // 🔗 REST API data streams synchronization hook layer
-    // 🔗 Clean Public REST API Live Synchronization Mechanism
-  u  // 🔗 REST API data streams synchronization hook layer (CORS-Proxy Safe)
+    // 🔗 REST API data streams synchronization loop
   useEffect(() => {
     async function fetchFinancialData() {
       try {
-        // 1. Fetch live ZAR Exchange Rate through your serverless API route
         const fxRes = await fetch('/api/yahoo?isFX=true');
         if (fxRes.ok) {
           const fxData = await fxRes.json();
-          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if (rate) setFxRate(rate);
+          // ✨ EXPLICIT BOUNDS CHECK: Eradicates minifier naming injection errors
+          if (fxData && fxData.chart && Array.isArray(fxData.chart.result)) {
+            const fxResult = fxData.chart.result[0];
+            const rate = fxResult?.meta?.regularMarketPrice;
+            if (rate) setFxRate(rate);
+          }
         }
       } catch (e) {
-        console.warn("Using baseline currency conversion anchor:", e.message);
+        console.warn("Currency synchronization fallback tracking active.");
       }
 
       try {
-        // 2. Fetch Stock Positions safely routed through your serverless proxy endpoints
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              // Fix parameter string interpolation securely
               const response = await fetch(`/api/yahoo?symbol=${stock.symbol}`);
               if (!response.ok) return stock;
               
               const data = await response.json();
-              const result = data?.chart?.result?.[0]; 
-              if (!result) return stock;
+              // ✨ EXPLICIT BOUNDS CHECK: Replaces uncompiled shortcuts to stop compiler crashes
+              if (!data || !data.chart || !Array.isArray(data.chart.result)) return stock;
+              
+              const result = data.chart.result[0];
+              if (!result || !result.meta) return stock;
 
-              const currentPrice = result.meta?.regularMarketPrice;
-              const previousClose = result.meta?.chartPreviousClose;
-              const historyPrices = result.indicators?.quote?.[0]?.close?.filter(p => p != null) || [currentPrice, currentPrice];
-              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
+              const currentPrice = result.meta.regularMarketPrice;
+              const previousClose = result.meta.chartPreviousClose;
+              
+              let historyPrices = [currentPrice, currentPrice];
+              if (result.indicators && result.indicators.quote && Array.isArray(result.indicators.quote[0].close)) {
+                const closedFiltered = result.indicators.quote[0].close.filter(p => p != null);
+                if (closedFiltered.length > 0) historyPrices = closedFiltered;
+              }
+              
+              const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
@@ -83,21 +79,14 @@ export default function App() {
                 history: historyPrices
               };
             } catch (e) {
-              // Safe individual position level catch block isolation fallback
-              const baseMap = { 'AAPL': 182.30, 'TSLA': 214.80, 'NVDA': 122.15 };
-              const defaultPrice = baseMap[stock.symbol] || 100.00;
-              return {
-                ...stock,
-                price: defaultPrice.toFixed(2),
-                history: [defaultPrice, defaultPrice]
-              };
+              return stock;
             }
           })
         );
         setStocks(updatedStocks);
         setLoading(false);
       } catch (err) {
-        console.error("Stocks loop tracking exception:", err.message);
+        console.error("Stocks pipeline aggregation exception:", err.message);
         setLoading(false);
       }
     }
@@ -114,8 +103,6 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('app_theme_mode', theme);
   }, [theme]);
-
-
 
   const totalNetWorthUSD = stocks.reduce((acc, s) => acc + (parseFloat(s.price || 0) * parseFloat(s.shares || 0)), 0);
   const displayTotalNetWorth = currency === 'ZAR' ? totalNetWorthUSD * fxRate : totalNetWorthUSD;
@@ -142,27 +129,16 @@ export default function App() {
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   const toggleCurrency = () => setCurrency(prev => prev === 'ZAR' ? 'USD' : 'ZAR');
 
-    const handleAddStock = (e) => {
+  const handleAddStock = (e) => {
     e.preventDefault();
     if (!inputSymbol || !inputShares) return;
     const symbolUpper = inputSymbol.toUpperCase().trim();
     
-    // Create distinct baseline prices so newly added assets don't default to the identical R1648 layout
-    const initialBasePrices = { 'AAPL': '182.30', 'TSLA': '214.80', 'NVDA': '122.15' };
+    const initialBasePrices = { 'AAPL': '182.30', 'TSLA': '214.80', 'NVDA': '123.07' };
     const starterPrice = initialBasePrices[symbolUpper] || (100 + Math.random() * 50).toFixed(2);
 
-    setStocks([...stocks, { 
-      symbol: symbolUpper, 
-      name: `${symbolUpper} Corp.`, 
-      shares: inputShares, 
-      price: starterPrice, // Injects a separate baseline value
-      change: '0.00%', 
-      isPositive: true, 
-      history: [parseFloat(starterPrice), parseFloat(starterPrice)] 
-    }]);
-
-    setInputSymbol(''); 
-    setInputShares('');
+    setStocks([...stocks, { symbol: symbolUpper, name: `${symbolUpper} Corp.`, shares: inputShares, price: starterPrice, change: '0.00%', isPositive: true, history: [parseFloat(starterPrice), parseFloat(starterPrice)] }]);
+    setInputSymbol(''); setInputShares('');
   };
 
   const handleRemoveStock = (sym) => setStocks(prev => prev.filter(s => s.symbol !== sym));
@@ -170,8 +146,7 @@ export default function App() {
   if (loading && stocks.every(s => s.price === '0.00')) {
     return <LoadingSpinner fullScreen={true} />;
   }
-
-  return (
+    return (
     <div className={`min-h-screen bg-semantic-app-bg p-6 flex flex-col items-center font-portfolio text-semantic-text-display transition-colors duration-200 ${theme === 'light' ? 'light-theme' : ''}`}>
       <div className="w-full max-w-lg space-y-6">
         
@@ -219,37 +194,6 @@ export default function App() {
           {stocks.map((stock) => (
             <StockRow key={stock.symbol} {...stock} currency={currency} fxRate={fxRate} onRemove={handleRemoveStock} />
           ))}
-        </div>
-
-        <div className="p-4 rounded-xl bg-semantic-surface-secondary border border-semantic-surface-primary/40 shadow-md space-y-3">
-          <h3 className="text-xs font-bold text-semantic-text-body px-1 uppercase tracking-wider">Live ZAR Crypto Watch</h3>
-          <div className="divide-y divide-semantic-surface-primary/30">
-            {cryptoCoins.map((coin) => {
-              const basePrice = coin.priceZAR || 0;
-              const changePercent = coin.change24h || 0;
-              const displayCryptoPrice = currency === 'ZAR' ? basePrice : basePrice / fxRate;
-              
-              return (
-                <div key={coin.id} className="flex justify-between items-center py-2.5 first:pt-0 last:pb-0">
-                  <div>
-                    <span className="font-bold text-sm text-semantic-text-display">{coin.symbol}</span>
-                    <span className="text-xs text-semantic-text-body ml-2 font-medium">{coin.name}</span>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-bold text-semantic-text-display">
-                      {currency === 'ZAR'
-                        ? displayCryptoPrice.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR', maximumFractionDigits: 0 })
-                        : displayCryptoPrice.toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
-                      }
-                    </p>
-                    <span className={`text-[10px] font-bold ${changePercent >= 0 ? 'text-semantic-stock-up' : 'text-semantic-stock-down'}`}>
-                      {changePercent >= 0 ? '+' : ''}{changePercent.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
         
       </div>
