@@ -27,18 +27,24 @@ export default function App() {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
-    // 🔗 CORS-Safe Direct Browser Fetch Loop (Bypasses Vercel IP Bans)
+    // 🔗 CORS-Safe Direct Browser Fetch Loop (Using Standard String Concatenation)
   useEffect(() => {
     async function fetchFinancialData() {
+      const proxyBase = 'https://allorigins.win';
+
       try {
         // 1. Fetch live USD to ZAR Exchange Rate
-        const fxTarget = encodeURIComponent('https://yahoo.com');
-        const fxRes = await fetch(`https://allorigins.win{fxTarget}`);
+        const fxUrl = 'https://yahoo.com';
+        const fxRes = await fetch(proxyBase + encodeURIComponent(fxUrl));
+        
         if (fxRes.ok) {
           const wrapper = await fxRes.json();
           const fxData = JSON.parse(wrapper.contents);
-          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if (rate) setFxRate(rate);
+          const resultList = fxData?.chart?.result;
+          if (Array.isArray(resultList) && resultList.length > 0) {
+            const rate = resultList[0]?.meta?.regularMarketPrice;
+            if (rate) setFxRate(rate);
+          }
         }
       } catch (e) {
         console.warn("Currency fallback active:", e.message);
@@ -49,8 +55,8 @@ export default function App() {
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              const targetUrl = encodeURIComponent(`https://yahoo.com{stock.symbol}?interval=1d&range=7d`);
-              const response = await fetch(`https://allorigins.win{targetUrl}`);
+              const yahooUrl = 'https://yahoo.com' + stock.symbol + '?interval=1d&range=7d';
+              const response = await fetch(proxyBase + encodeURIComponent(yahooUrl));
               if (!response.ok) return stock;
               
               const wrapper = await response.json();
@@ -63,19 +69,19 @@ export default function App() {
               const previousClose = result.meta?.chartPreviousClose;
               
               let historyPrices = [currentPrice, currentPrice];
-              const rawCloses = result.indicators?.quote?.[0]?.close;
-              if (Array.isArray(rawCloses)) {
-                const closedFiltered = rawCloses.filter(p => p != null);
+              const quoteList = result.indicators?.quote;
+              if (Array.isArray(quoteList) && quoteList.length > 0 && Array.isArray(quoteList[0].close)) {
+                const closedFiltered = quoteList[0].close.filter(p => p != null);
                 if (closedFiltered.length > 0) historyPrices = closedFiltered;
               }
               
-              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
+              const officialCompanyName = result.meta?.longName || (stock.symbol + ' Corp.');
 
               return {
                 ...stock,
                 name: officialCompanyName,
                 price: currentPrice.toFixed(2),
-                change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
+                change: ((currentPrice - previousClose) >= 0 ? '+' : '') + (((currentPrice - previousClose) / previousClose) * 100).toFixed(2) + '%',
                 isPositive: (currentPrice - previousClose) >= 0,
                 history: historyPrices
               };
@@ -96,7 +102,6 @@ export default function App() {
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
   }, [stocks.length]);
-
 
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
