@@ -106,7 +106,7 @@ export default function App() {
     let newChange = '0.00%';
     let isPos = true;
     let companyName = `${symbolUpper} Corp.`;
-    let historyPrices =;
+    let historyPrices = [];
 
     try {
       // Fetch quote for ONLY this single new ticker
@@ -198,17 +198,7 @@ export default function App() {
   const toggleTheme = () => setTheme(prev => prev === 'dark' ? 'light' : 'dark');
   const toggleCurrency = () => setCurrency(prev => prev === 'ZAR' ? 'USD' : 'ZAR');
 
-  const handleAddStock = (e) => {
-    e.preventDefault();
-    if (!inputSymbol || !inputShares) return;
-    const symbolUpper = inputSymbol.toUpperCase().trim();
-    
-    const initialBasePrices = { 'AAPL': '182.30', 'TSLA': '214.80', 'NVDA': '123.07' };
-    const starterPrice = initialBasePrices[symbolUpper] || (100 + Math.random() * 50).toFixed(2);
-
-    setStocks([...stocks, { symbol: symbolUpper, name: `${symbolUpper} Corp.`, shares: inputShares, price: starterPrice, change: '0.00%', isPositive: true, history: [parseFloat(starterPrice), parseFloat(starterPrice)] }]);
-    setInputSymbol(''); setInputShares('');
-  };
+ 
 
   const handleRemoveStock = (sym) => setStocks(prev => prev.filter(s => s.symbol !== sym));
 
