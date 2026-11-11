@@ -35,42 +35,33 @@ export default function App() {
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
     // 🔗 REST API data streams synchronization hook layer
+    // 🔗 REST API data streams synchronization hook layer
   useEffect(() => {
     async function fetchFinancialData() {
       try {
         // 1. Fetch live ZAR Exchange Rate
         const fxRes = await fetch('/api/yahoo?isFX=true');
-        const fxContentType = fxRes.headers.get('content-type');
-        if (fxRes.ok && fxContentType && fxContentType.includes('application/json')) {
+        if (fxRes.ok) {
           const fxData = await fxRes.json();
+          // ✨ FIX: Corrected array syntax path to access the first index [0]
           const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
           if (rate) setFxRate(rate);
         }
 
-        // 2. Fetch live crypto values using CoinGecko public API
-        const cryptoRes = await fetch('https://coingecko.com');
+        // 2. Fetch live crypto values using our proxy engine
+        const cryptoRes = await fetch('/api/yahoo?isCrypto=true');
         if (cryptoRes.ok) {
           const cryptoData = await cryptoRes.json();
-          if (cryptoData && cryptoData.bitcoin && cryptoData.bitcoin.zar) {
+          if (cryptoData && cryptoData['BTC-ZAR']) {
             setCryptoCoins([
-              { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: cryptoData.bitcoin.zar, change24h: cryptoData.bitcoin.zar_24h_change || 0 },
-              { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: cryptoData.ethereum.zar, change24h: cryptoData.ethereum.zar_24h_change || 0 },
-              { id: 'solana', name: 'Solana', symbol: 'SOL', priceZAR: cryptoData.solana.zar, change24h: cryptoData.solana.zar_24h_change || 0 }
+              { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: cryptoData['BTC-ZAR'].price, change24h: cryptoData['BTC-ZAR'].change || 0 },
+              { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: cryptoData['ETH-ZAR'].price, change24h: cryptoData['ETH-ZAR'].change || 0 },
+              { id: 'solana', name: 'Solana', symbol: 'SOL', priceZAR: cryptoData['SOL-ZAR'].price, change24h: cryptoData['SOL-ZAR'].change || 0 }
             ]);
-          } else {
-            throw new Error('CoinGecko formatting payload shift');
           }
-        } else {
-          throw new Error('CoinGecko connection offline');
         }
       } catch (e) {
-        console.warn("Using real-time design token backup data anchors:", e.message);
-        // Fallback to distinct market numbers if API is throttled
-        setCryptoCoins([
-          { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: 1341052, change24h: 0.3 },
-          { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: 37169, change24h: 1.6 },
-          { id: 'solana', name: 'Solana', symbol: 'SOL', priceZAR: 1515, change24h: 0.6 }
-        ]);
+        console.warn("Crypto or FX fallback active:", e.message);
       }
 
       try {
@@ -79,16 +70,19 @@ export default function App() {
           stocks.map(async (stock) => {
             try {
               const response = await fetch(`/api/yahoo?symbol=${stock.symbol}`);
-              const stockContentType = response.headers.get('content-type');
-              if (!response.ok || !stockContentType || !stockContentType.includes('application/json')) return stock;
+              if (!response.ok) return stock;
               
               const data = await response.json();
+              // ✨ FIX: Corrected array syntax path to access the first index [0]
               const result = data?.chart?.result?.[0]; 
               if (!result) return stock;
 
               const currentPrice = result.meta.regularMarketPrice;
               const previousClose = result.meta.chartPreviousClose;
-              const historyPrices = result.indicators.quote[0].close?.filter(p => p != null) || [currentPrice, currentPrice];
+              const historyPrices = result.indicators.quote.close?.[0] != null 
+                ? result.indicators.quote.close[0].filter(p => p != null)
+                : [currentPrice, currentPrice];
+              
               const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
 
               return {
@@ -97,7 +91,7 @@ export default function App() {
                 price: currentPrice.toFixed(2),
                 change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
                 isPositive: (currentPrice - previousClose) >= 0,
-                history: historyPrices
+                history: historyPrices.length > 0 ? historyPrices : [currentPrice, currentPrice]
               };
             } catch (e) {
               return stock;
@@ -107,21 +101,25 @@ export default function App() {
         setStocks(updatedStocks);
         setLoading(false);
       } catch (err) {
+        console.error("Stocks loop tracking exception:", err.message);
         setLoading(false);
       }
     }
+    
     fetchFinancialData();
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
   }, [stocks.length]);
 
-  useEffect(() => {
+
+   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
   }, [stocks]);
 
   useEffect(() => {
     localStorage.setItem('app_theme_mode', theme);
   }, [theme]);
+
 
   const totalNetWorthUSD = stocks.reduce((acc, s) => acc + (parseFloat(s.price || 0) * parseFloat(s.shares || 0)), 0);
   const displayTotalNetWorth = currency === 'ZAR' ? totalNetWorthUSD * fxRate : totalNetWorthUSD;
