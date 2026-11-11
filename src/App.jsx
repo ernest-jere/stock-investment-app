@@ -27,17 +27,8 @@ export default function App() {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
-    useEffect(() => {
-    async function fetchFinancialData() {
-      try {
-        const fxRes = await fetch('/api/yahoo?isFX=true');
-        const fxContentType = fxRes.headers.get('content-type');
-        if (fxRes.ok && fxContentType && fxContentType.includes('application/json')) {
-          const fxData = await fxRes.json();
-          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if (rate) setFxRate(rate);
-        }
-
+  useEffect(() => {
+            // Fetch updated stock prices with high fault tolerance
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
@@ -46,12 +37,12 @@ export default function App() {
               if (!response.ok || !stockContentType || !stockContentType.includes('application/json')) return stock;
               
               const data = await response.json();
-              const result = data?.chart?.result?.[0];
+              const result = data?.chart?.result?.[0]; 
               if (!result) return stock;
 
               const currentPrice = result.meta.regularMarketPrice;
               const previousClose = result.meta.chartPreviousClose;
-              const historyPrices = result.indicators.quote.close.filter(p => p != null);
+              const historyPrices = result.indicators.quote.close?.filter(p => p != null) || [currentPrice, currentPrice];
               const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
 
               return {
@@ -63,34 +54,13 @@ export default function App() {
                 history: historyPrices
               };
             } catch (e) {
+              // ✨ SAFE MUTATION GUARD: If a single asset fails or is not found on Yahoo, keep its own data
               return stock;
             }
           })
         );
         setStocks(updatedStocks);
         setLoading(false);
-      } catch (e) {
-        console.warn("Using design token backup data anchors:", e.message);
-        const baselinePrices = { 'AAPL': 180.50, 'TSLA': 215.30, 'NVDA': 123.07 };
-        const fallbackNames = { 'AAPL': 'Apple Inc.', 'TSLA': 'Tesla, Inc.', 'NVDA': 'NVIDIA Corporation' };
-
-        setStocks(prev => prev.map(s => {
-          const defaultUSD = baselinePrices[s.symbol] || 100.00;
-          return {
-            ...s,
-            name: fallbackNames[s.symbol] || `${s.symbol} Corp.`,
-            price: defaultUSD.toFixed(2),
-            change: '0.00%',
-            isPositive: true,
-            history: [defaultUSD, defaultUSD]
-          };
-        }));
-        setLoading(false);
-      }
-    }
-    fetchFinancialData();
-    const interval = setInterval(fetchFinancialData, 60000);
-    return () => clearInterval(interval);
   }, [stocks.length]);
 
   useEffect(() => {
