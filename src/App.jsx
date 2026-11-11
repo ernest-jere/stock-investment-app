@@ -27,48 +27,37 @@ export default function App() {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
-    // 🔗 Bulletproof URL Assembly (Prevents Clipboard Domain Stripping)
+  
+  // 🔗 High-Speed CORS-Safe Fetch Loop
   useEffect(() => {
     async function fetchFinancialData() {
-      const buildProxyUrl = (targetPath) => {
-        const proxyDomain = ['api', 'allorigins', 'win'].join('.');
-        const proxy = new URL(`https://${proxyDomain}/get`);
-        proxy.searchParams.set('url', targetPath);
-        return proxy.toString();
-      };
-
-      const yahooDomain = ['query2', 'finance', 'yahoo', 'com'].join('.');
-      const yahooApiBase = `https://${yahooDomain}/v8/finance/chart/`;
-
+      // 1. Fetch live USD to ZAR Exchange Rate directly (No proxy needed)
       try {
-        // 1. Fetch live USD to ZAR Exchange Rate
-        const fxTarget = yahooApiBase + 'ZAR=X?interval=1d&range=1d';
-        const fxRes = await fetch(buildProxyUrl(fxTarget));
-        
+        const erDomain = ['open', 'er-api', 'com'].join('.');
+        const fxRes = await fetch(`https://${erDomain}/v6/latest/USD`);
         if (fxRes.ok) {
-          const wrapper = await fxRes.json();
-          const fxData = JSON.parse(wrapper.contents);
-          const resultList = fxData?.chart?.result;
-          if (Array.isArray(resultList) && resultList.length > 0) {
-            const rate = resultList[0]?.meta?.regularMarketPrice;
-            if (rate) setFxRate(rate);
-          }
+          const fxData = await fxRes.json();
+          const rate = fxData?.rates?.ZAR;
+          if (rate) setFxRate(rate);
         }
       } catch (e) {
         console.warn("Currency fallback active:", e.message);
       }
 
+      // 2. Fetch Stock Positions via corsproxy.io
       try {
-        // 2. Fetch Stock Positions
+        const proxyDomain = ['corsproxy', 'io'].join('.');
+        const yahooDomain = ['query2', 'finance', 'yahoo', 'com'].join('.');
+
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              const stockTarget = yahooApiBase + stock.symbol + '?interval=1d&range=7d';
-              const response = await fetch(buildProxyUrl(stockTarget));
+              const targetUrl = `https://${yahooDomain}/v8/finance/chart/${stock.symbol}?interval=1d&range=7d`;
+              const response = await fetch(`https://${proxyDomain}/?${encodeURIComponent(targetUrl)}`);
               if (!response.ok) return stock;
               
-              const wrapper = await response.json();
-              const data = JSON.parse(wrapper.contents);
+              // corsproxy.io returns the raw JSON directly (no .contents wrapper needed)
+              const data = await response.json();
               const resultList = data?.chart?.result;
               if (!Array.isArray(resultList) || resultList.length === 0) return stock;
               
@@ -77,19 +66,19 @@ export default function App() {
               const previousClose = result.meta?.chartPreviousClose;
               
               let historyPrices = [currentPrice, currentPrice];
-              const quoteList = result.indicators?.quote;
-              if (Array.isArray(quoteList) && quoteList.length > 0 && Array.isArray(quoteList[0].close)) {
-                const closedFiltered = quoteList[0].close.filter(p => p != null);
+              const rawCloses = result.indicators?.quote?.[0]?.close;
+              if (Array.isArray(rawCloses)) {
+                const closedFiltered = rawCloses.filter(p => p != null);
                 if (closedFiltered.length > 0) historyPrices = closedFiltered;
               }
               
-              const officialCompanyName = result.meta?.longName || (stock.symbol + ' Corp.');
+              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
                 name: officialCompanyName,
                 price: currentPrice.toFixed(2),
-                change: ((currentPrice - previousClose) >= 0 ? '+' : '') + (((currentPrice - previousClose) / previousClose) * 100).toFixed(2) + '%',
+                change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
                 isPositive: (currentPrice - previousClose) >= 0,
                 history: historyPrices
               };
@@ -110,7 +99,6 @@ export default function App() {
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
   }, [stocks.length]);
-
 
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
