@@ -29,80 +29,141 @@ export default function App() {
   });
   
   // 🔗 Official Direct CORS-Enabled Fetch Loop (Finnhub + Open ER-API)
+    // 1. Fetch live FX and initial portfolio quotes ONCE on mount, then every 60 seconds
   useEffect(() => {
-    const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_KEY;
+    const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_KEY || 'YOUR_FINNHUB_API_KEY';
+    const finnhubDomain = ['finnhub', 'io'].join('.');
 
-    async function fetchFinancialData() {
-      // 1. Fetch live USD to ZAR Exchange Rate directly
+    async function fetchAllData() {
+      // Fetch USD to ZAR Exchange Rate
       try {
         const erDomain = ['open', 'er-api', 'com'].join('.');
         const fxRes = await fetch(`https://${erDomain}/v6/latest/USD`);
         if (fxRes.ok) {
           const fxData = await fxRes.json();
-          const rate = fxData?.rates?.ZAR;
-          if (rate) setFxRate(rate);
+          if (fxData?.rates?.ZAR) setFxRate(fxData.rates.ZAR);
         }
       } catch (e) {
         console.warn('Currency fallback active:', e.message);
       }
 
-      // 2. Fetch Stock Quotes directly from Finnhub (No proxy needed)
-      try {
-        const finnhubDomain = ['finnhub', 'io'].join('.');
-
-        const updatedStocks = await Promise.all(
-          stocks.map(async (stock) => {
+      // Fetch quotes for current stocks without triggering re-render loops
+      setStocks((currentStocks) => {
+        Promise.all(
+          currentStocks.map(async (stock) => {
             try {
-              // Fetch live quote (c = current price, pc = previous close, dp = percent change)
               const quoteUrl = `https://${finnhubDomain}/api/v1/quote?symbol=${stock.symbol}&token=${FINNHUB_KEY}`;
               const response = await fetch(quoteUrl);
               if (!response.ok) return stock;
-              
+
               const data = await response.json();
               if (!data || !data.c || data.c === 0) return stock;
-              
+
               const currentPrice = data.c;
               const prevClose = data.pc || currentPrice;
               const changePct = data.dp || 0;
-              
-              // Build a smooth trend curve from previous close to current price
               const midPoint = (prevClose + currentPrice) / 2;
-              const historyPrices = [prevClose, midPoint * 0.995, midPoint * 1.005, currentPrice];
-
-              const nameMap = {
-                AAPL: 'Apple Inc.',
-                TSLA: 'Tesla, Inc.',
-                NVDA: 'NVIDIA Corporation',
-                MSFT: 'Microsoft Corporation',
-                AMZN: 'Amazon.com, Inc.',
-                GOOGL: 'Alphabet Inc.'
-              };
 
               return {
                 ...stock,
-                name: nameMap[stock.symbol] || `${stock.symbol} Corp.`,
                 price: currentPrice.toFixed(2),
                 change: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`,
                 isPositive: changePct >= 0,
-                history: historyPrices
+                history: [prevClose, midPoint * 0.995, midPoint * 1.005, currentPrice]
               };
-            } catch (e) {
+            } catch {
               return stock;
             }
           })
-        );
-        setStocks(updatedStocks);
-        setLoading(false);
-      } catch (err) {
-        console.error('Stocks pipeline exception:', err.message);
-        setLoading(false);
-      }
+        ).then((updated) => {
+          setStocks(updated);
+          setLoading(false);
+        });
+
+        return currentStocks;
+      });
     }
-    
-    fetchFinancialData();
-    const interval = setInterval(fetchFinancialData, 60000);
+
+    fetchAllData();
+    const interval = setInterval(fetchAllData, 60000);
     return () => clearInterval(interval);
-  }, [stocks.length]);
+  }, []); // Empty dependency array stops the infinite flickering loop
+
+  // 2. Fetch ONLY the newly added stock when the user clicks "Add Asset"
+  const handleAddStock = async (e) => {
+    e.preventDefault();
+    if (!inputSymbol || !inputShares) return;
+
+    const symbolUpper = inputSymbol.toUpperCase().trim();
+    const sharesToAdd = inputShares;
+    setInputSymbol('');
+    setInputShares('');
+
+    const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_KEY || 'YOUR_FINNHUB_API_KEY';
+    const finnhubDomain = ['finnhub', 'io'].join('.');
+
+    let newPrice = '100.00';
+    let newChange = '0.00%';
+    let isPos = true;
+    let companyName = `${symbolUpper} Corp.`;
+    let historyPrices =;
+
+    try {
+      // Fetch quote for ONLY this single new ticker
+      const quoteRes = await fetch(`https://${finnhubDomain}/api/v1/quote?symbol=${symbolUpper}&token=${FINNHUB_KEY}`);
+      if (quoteRes.ok) {
+        const data = await quoteRes.json();
+        if (data && data.c && data.c !== 0) {
+          const prevClose = data.pc || data.c;
+          const changePct = data.dp || 0;
+          const midPoint = (prevClose + data.c) / 2;
+
+          newPrice = data.c.toFixed(2);
+          newChange = `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`;
+          isPos = changePct >= 0;
+          historyPrices = [prevClose, midPoint * 0.995, midPoint * 1.005, data.c];
+        }
+      }
+
+      // Fetch company profile name once
+      const profileRes = await fetch(`https://${finnhubDomain}/api/v1/stock/profile2?symbol=${symbolUpper}&token=${FINNHUB_KEY}`);
+      if (profileRes.ok) {
+        const profileData = await profileRes.json();
+        if (profileData && profileData.name) {
+          companyName = profileData.name;
+        }
+      }
+    } catch (err) {
+      console.warn('Single ticker fetch fallback:', err.message);
+    }
+
+    setStocks((prev) => {
+      const existingIndex = prev.findIndex((s) => s.symbol === symbolUpper);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          shares: (parseFloat(updated[existingIndex].shares) + parseFloat(sharesToAdd)).toString(),
+          price: newPrice,
+          change: newChange,
+          isPositive: isPos
+        };
+        return updated;
+      }
+      return [
+        ...prev,
+        {
+          symbol: symbolUpper,
+          name: companyName,
+          shares: sharesToAdd,
+          price: newPrice,
+          change: newChange,
+          isPositive: isPos,
+          history: historyPrices
+        }
+      ];
+    });
+  };
 
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
