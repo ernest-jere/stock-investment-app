@@ -27,15 +27,23 @@ export default function App() {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
-    // 🔗 CORS-Safe Direct Browser Fetch Loop (Using Standard String Concatenation)
+    // 🔗 Bulletproof URL Assembly (Prevents Clipboard Domain Stripping)
   useEffect(() => {
     async function fetchFinancialData() {
-      const proxyBase = 'https://allorigins.win';
+      const buildProxyUrl = (targetPath) => {
+        const proxyDomain = ['api', 'allorigins', 'win'].join('.');
+        const proxy = new URL(`https://${proxyDomain}/get`);
+        proxy.searchParams.set('url', targetPath);
+        return proxy.toString();
+      };
+
+      const yahooDomain = ['query2', 'finance', 'yahoo', 'com'].join('.');
+      const yahooApiBase = `https://${yahooDomain}/v8/finance/chart/`;
 
       try {
         // 1. Fetch live USD to ZAR Exchange Rate
-        const fxUrl = 'https://yahoo.com';
-        const fxRes = await fetch(proxyBase + encodeURIComponent(fxUrl));
+        const fxTarget = yahooApiBase + 'ZAR=X?interval=1d&range=1d';
+        const fxRes = await fetch(buildProxyUrl(fxTarget));
         
         if (fxRes.ok) {
           const wrapper = await fxRes.json();
@@ -51,12 +59,12 @@ export default function App() {
       }
 
       try {
-        // 2. Fetch Stock Positions via AllOrigins CORS Proxy
+        // 2. Fetch Stock Positions
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              const yahooUrl = 'https://yahoo.com' + stock.symbol + '?interval=1d&range=7d';
-              const response = await fetch(proxyBase + encodeURIComponent(yahooUrl));
+              const stockTarget = yahooApiBase + stock.symbol + '?interval=1d&range=7d';
+              const response = await fetch(buildProxyUrl(stockTarget));
               if (!response.ok) return stock;
               
               const wrapper = await response.json();
@@ -102,6 +110,7 @@ export default function App() {
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
   }, [stocks.length]);
+
 
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
