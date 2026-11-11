@@ -39,44 +39,37 @@ export default function App() {
     return savedHistory && !savedHistory.includes('1648') ? JSON.parse(savedHistory) : [];
   });
 
+    // 🔗 REST API data streams synchronization hook layer
   useEffect(() => {
     async function fetchFinancialData() {
       try {
-        const fxRes = await fetch('https://yahoo.com');
+        // 1. Fetch live ZAR Exchange Rate through your serverless api route
+        const fxRes = await fetch('/api/yahoo?isFX=true');
         if (fxRes.ok) {
           const fxData = await fxRes.json();
           const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
           if (rate) setFxRate(rate);
         }
       } catch (e) {
-        console.warn("Using baseline currency anchor");
+        console.warn("Using baseline currency conversion anchor");
       }
 
       try {
-                const updatedStocks = await Promise.all(
+        // 2. Fetch Stock Positions safely routed through your proxy
+        const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
               const response = await fetch(`/api/yahoo?symbol=${stock.symbol}`);
-              const stockContentType = response.headers.get('content-type');
-              if (!response.ok || !stockContentType || !stockContentType.includes('application/json')) return stock;
+              if (!response.ok) return stock;
               
               const data = await response.json();
-              // Extract data using safe structured property access chains
-              const resultList = data && data.chart && data.chart.result;
-              if (!Array.isArray(resultList) || resultList.length === 0) return stock;
-              
-              const result = resultList[0];
-              const currentPrice = result.meta?.regularMarketPrice;
-              const previousClose = result.meta?.chartPreviousClose;
-              
-              // Clean history trends: Filter out any null values returned from Yahoo's feed
-              let cleanHistory = [currentPrice, currentPrice];
-              if (result.indicators?.quote?.[0]?.close) {
-                const filtered = result.indicators.quote[0].close.filter(p => p != null);
-                if (filtered.length > 0) cleanHistory = filtered;
-              }
-              
-              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
+              const result = data?.chart?.result?.[0]; 
+              if (!result) return stock;
+
+              const currentPrice = result.meta.regularMarketPrice;
+              const previousClose = result.meta.chartPreviousClose;
+              const historyPrices = result.indicators?.quote?.[0]?.close?.filter(p => p != null) || [currentPrice, currentPrice];
+              const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
@@ -84,14 +77,13 @@ export default function App() {
                 price: currentPrice.toFixed(2),
                 change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
                 isPositive: (currentPrice - previousClose) >= 0,
-                history: cleanHistory // Applies the dynamic sanitized curve
+                history: historyPrices
               };
             } catch (e) {
-              return stock; // Preserves individual state instead of flatlining the array
+              return stock;
             }
           })
         );
-
         setStocks(updatedStocks);
         setLoading(false);
       } catch (err) {
@@ -103,7 +95,8 @@ export default function App() {
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
   }, [stocks.length]);
-    useEffect(() => {
+
+  useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
   }, [stocks]);
 
