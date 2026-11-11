@@ -36,6 +36,7 @@ export default function App() {
   });
     // 🔗 REST API data streams synchronization hook layer
     // 🔗 REST API data streams synchronization hook layer
+    // 🔗 REST API data streams synchronization hook layer
   useEffect(() => {
     async function fetchFinancialData() {
       try {
@@ -43,9 +44,11 @@ export default function App() {
         const fxRes = await fetch('/api/yahoo?isFX=true');
         if (fxRes.ok) {
           const fxData = await fxRes.json();
-          // ✨ FIX: Corrected array syntax path to access the first index [0]
-          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
-          if (rate) setFxRate(rate);
+          const result = fxData && fxData.chart && fxData.chart.result;
+          if (Array.isArray(result) && result[0]) {
+            const rate = result[0].meta?.regularMarketPrice;
+            if (rate) setFxRate(rate);
+          }
         }
 
         // 2. Fetch live crypto values using our proxy engine
@@ -73,17 +76,20 @@ export default function App() {
               if (!response.ok) return stock;
               
               const data = await response.json();
-              // ✨ FIX: Corrected array syntax path to access the first index [0]
-              const result = data?.chart?.result?.[0]; 
-              if (!result) return stock;
-
-              const currentPrice = result.meta.regularMarketPrice;
-              const previousClose = result.meta.chartPreviousClose;
-              const historyPrices = result.indicators.quote.close?.[0] != null 
-                ? result.indicators.quote.close[0].filter(p => p != null)
-                : [currentPrice, currentPrice];
+              const resultList = data && data.chart && data.chart.result;
+              if (!Array.isArray(resultList) || !resultList[0]) return stock;
               
-              const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
+              const result = resultList[0];
+              const currentPrice = result.meta?.regularMarketPrice;
+              const previousClose = result.meta?.chartPreviousClose;
+              
+              let historyPrices = [currentPrice, currentPrice];
+              if (result.indicators && result.indicators.quote && Array.isArray(result.indicators.quote[0]?.close)) {
+                const closedFiltered = result.indicators.quote[0].close.filter(p => p != null);
+                if (closedFiltered.length > 0) historyPrices = closedFiltered;
+              }
+              
+              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
@@ -91,7 +97,7 @@ export default function App() {
                 price: currentPrice.toFixed(2),
                 change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
                 isPositive: (currentPrice - previousClose) >= 0,
-                history: historyPrices.length > 0 ? historyPrices : [currentPrice, currentPrice]
+                history: historyPrices
               };
             } catch (e) {
               return stock;
@@ -109,10 +115,9 @@ export default function App() {
     fetchFinancialData();
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
-  }, [stocks.length]);
-
-
-   useEffect(() => {
+  }, [stocks.length]);  
+  
+  useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
   }, [stocks]);
 
