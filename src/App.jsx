@@ -27,48 +27,49 @@ export default function App() {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
-    // 🔗 REST API data streams synchronization loop
+    // 🔗 CORS-Safe Direct Browser Fetch Loop (Bypasses Vercel IP Bans)
   useEffect(() => {
     async function fetchFinancialData() {
       try {
-        const fxRes = await fetch('/api/yahoo?isFX=true');
+        // 1. Fetch live USD to ZAR Exchange Rate
+        const fxTarget = encodeURIComponent('https://yahoo.com');
+        const fxRes = await fetch(`https://allorigins.win{fxTarget}`);
         if (fxRes.ok) {
-          const fxData = await fxRes.json();
-          // ✨ EXPLICIT BOUNDS CHECK: Eradicates minifier naming injection errors
-          if (fxData && fxData.chart && Array.isArray(fxData.chart.result)) {
-            const fxResult = fxData.chart.result[0];
-            const rate = fxResult?.meta?.regularMarketPrice;
-            if (rate) setFxRate(rate);
-          }
+          const wrapper = await fxRes.json();
+          const fxData = JSON.parse(wrapper.contents);
+          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (rate) setFxRate(rate);
         }
       } catch (e) {
-        console.warn("Currency synchronization fallback tracking active.");
+        console.warn("Currency fallback active:", e.message);
       }
 
       try {
+        // 2. Fetch Stock Positions via AllOrigins CORS Proxy
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              const response = await fetch(`/api/yahoo?symbol=${stock.symbol}`);
+              const targetUrl = encodeURIComponent(`https://yahoo.com{stock.symbol}?interval=1d&range=7d`);
+              const response = await fetch(`https://allorigins.win{targetUrl}`);
               if (!response.ok) return stock;
               
-              const data = await response.json();
-              // ✨ EXPLICIT BOUNDS CHECK: Replaces uncompiled shortcuts to stop compiler crashes
-              if (!data || !data.chart || !Array.isArray(data.chart.result)) return stock;
+              const wrapper = await response.json();
+              const data = JSON.parse(wrapper.contents);
+              const resultList = data?.chart?.result;
+              if (!Array.isArray(resultList) || resultList.length === 0) return stock;
               
-              const result = data.chart.result[0];
-              if (!result || !result.meta) return stock;
-
-              const currentPrice = result.meta.regularMarketPrice;
-              const previousClose = result.meta.chartPreviousClose;
+              const result = resultList[0];
+              const currentPrice = result.meta?.regularMarketPrice;
+              const previousClose = result.meta?.chartPreviousClose;
               
               let historyPrices = [currentPrice, currentPrice];
-              if (result.indicators && result.indicators.quote && Array.isArray(result.indicators.quote[0].close)) {
-                const closedFiltered = result.indicators.quote[0].close.filter(p => p != null);
+              const rawCloses = result.indicators?.quote?.[0]?.close;
+              if (Array.isArray(rawCloses)) {
+                const closedFiltered = rawCloses.filter(p => p != null);
                 if (closedFiltered.length > 0) historyPrices = closedFiltered;
               }
               
-              const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
+              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
@@ -86,7 +87,7 @@ export default function App() {
         setStocks(updatedStocks);
         setLoading(false);
       } catch (err) {
-        console.error("Stocks pipeline aggregation exception:", err.message);
+        console.error("Stocks pipeline exception:", err.message);
         setLoading(false);
       }
     }
@@ -95,6 +96,7 @@ export default function App() {
     const interval = setInterval(fetchFinancialData, 60000);
     return () => clearInterval(interval);
   }, [stocks.length]);
+
 
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
