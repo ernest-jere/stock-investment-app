@@ -27,8 +27,19 @@ export default function App() {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
+    // 🔗 REST API data streams synchronization hook layer
   useEffect(() => {
-            // Fetch updated stock prices with high fault tolerance
+    // ⚡ FIX: Added 'async' keyword right before function keyword to clear compilation error
+    async function fetchFinancialData() {
+      try {
+        const fxRes = await fetch('/api/yahoo?isFX=true');
+        const fxContentType = fxRes.headers.get('content-type');
+        if (fxRes.ok && fxContentType && fxContentType.includes('application/json')) {
+          const fxData = await fxRes.json();
+          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
+          if (rate) setFxRate(rate);
+        }
+
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
@@ -37,12 +48,12 @@ export default function App() {
               if (!response.ok || !stockContentType || !stockContentType.includes('application/json')) return stock;
               
               const data = await response.json();
-              const result = data?.chart?.result?.[0]; 
+              const result = data?.chart?.result?.[0];
               if (!result) return stock;
 
               const currentPrice = result.meta.regularMarketPrice;
               const previousClose = result.meta.chartPreviousClose;
-              const historyPrices = result.indicators.quote.close?.filter(p => p != null) || [currentPrice, currentPrice];
+              const historyPrices = result.indicators.quote.close[0].filter(p => p != null);
               const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
 
               return {
@@ -54,13 +65,20 @@ export default function App() {
                 history: historyPrices
               };
             } catch (e) {
-              // ✨ SAFE MUTATION GUARD: If a single asset fails or is not found on Yahoo, keep its own data
-              return stock;
+              return stock; // Safe return on local exception mutations
             }
           })
         );
         setStocks(updatedStocks);
         setLoading(false);
+      } catch (e) {
+        console.warn("Using design token backup data anchors:", e.message);
+        setLoading(false);
+      }
+    }
+    fetchFinancialData();
+    const interval = setInterval(fetchFinancialData, 60000);
+    return () => clearInterval(interval);
   }, [stocks.length]);
 
   useEffect(() => {
@@ -113,7 +131,7 @@ export default function App() {
     <div className={`min-h-screen bg-semantic-app-bg p-6 flex flex-col items-center font-portfolio text-semantic-text-display transition-colors duration-200 ${theme === 'light' ? 'light-theme' : ''}`}>
       <div className="w-full max-w-lg space-y-6">
         
-        {/* Navigation Section */}
+        {/* Navigation Toolbar */}
         <div className="flex justify-between items-center mb-2 gap-2">
           <h1 className="text-xl font-bold tracking-tight">InvestTrack</h1>
           <div className="flex gap-2">
@@ -146,7 +164,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* Volatility Risk Indicator Panel */}
+        {/* Risk Beta Component */}
         <PortfolioBetaBlock stocks={stocks} />
 
         {/* Asset Adding Form */}
@@ -168,3 +186,5 @@ export default function App() {
     </div>
   );
 }
+
+
