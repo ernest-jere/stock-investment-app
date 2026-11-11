@@ -41,65 +41,63 @@ export default function App() {
 
     // 🔗 REST API data streams synchronization hook layer
     // 🔗 Clean Public REST API Live Synchronization Mechanism
+  u  // 🔗 REST API data streams synchronization hook layer (CORS-Proxy Safe)
   useEffect(() => {
     async function fetchFinancialData() {
       try {
-        // 1. Pull real-time ZAR conversion indices using an alternate open tracker
-        const fxRes = await fetch('https://er-api.com');
+        // 1. Fetch live ZAR Exchange Rate through your serverless API route
+        const fxRes = await fetch('/api/yahoo?isFX=true');
         if (fxRes.ok) {
           const fxData = await fxRes.json();
-          const rate = fxData?.rates?.ZAR;
+          const rate = fxData?.chart?.result?.[0]?.meta?.regularMarketPrice;
           if (rate) setFxRate(rate);
         }
       } catch (e) {
-        console.warn("Using baseline design token currency anchor.");
+        console.warn("Using baseline currency conversion anchor:", e.message);
       }
 
       try {
-        // 2. Fetch Stock Positions using open financial data systems
+        // 2. Fetch Stock Positions safely routed through your serverless proxy endpoints
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              // We target an open, highly reliable ticker query terminal framework
-              const response = await fetch(`https://microsite.finance{stock.symbol}`);
+              // Fix parameter string interpolation securely
+              const response = await fetch(`/api/yahoo?symbol=${stock.symbol}`);
+              if (!response.ok) return stock;
               
-              if (response.ok) {
-                const data = await response.json();
-                return {
-                  ...stock,
-                  name: data.companyName || `${stock.symbol} Inc.`,
-                  price: parseFloat(data.price).toFixed(2),
-                  change: `${data.changePercent >= 0 ? '+' : ''}${data.changePercent.toFixed(2)}%`,
-                  isPositive: data.changePercent >= 0,
-                  history: Array.isArray(data.history) ? data.history : [data.price * 0.98, data.price]
-                };
-              }
-              throw new Error('API routing timeout');
-            } catch (e) {
-              // ✨ SECURE IMMUTABLE FALLBACK: Restores separate, rich fallback metrics on network throttles
-              const defaultUSDMap = { 'AAPL': 183.92, 'TSLA': 218.45, 'NVDA': 124.12 };
-              const officialNameMap = { 'AAPL': 'Apple Inc.', 'TSLA': 'Tesla, Inc.', 'NVDA': 'NVIDIA Corporation' };
-              
-              const defaultUSD = defaultUSDMap[stock.symbol] || 110.00;
-              const mockPercent = (Math.random() * 4 - 2);
-              const calculatedPrice = defaultUSD * (1 + mockPercent / 100);
+              const data = await response.json();
+              const result = data?.chart?.result?.[0]; 
+              if (!result) return stock;
+
+              const currentPrice = result.meta?.regularMarketPrice;
+              const previousClose = result.meta?.chartPreviousClose;
+              const historyPrices = result.indicators?.quote?.[0]?.close?.filter(p => p != null) || [currentPrice, currentPrice];
+              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
-                name: officialNameMap[stock.symbol] || `${stock.symbol} Corp.`,
-                price: calculatedPrice.toFixed(2),
-                change: `${mockPercent >= 0 ? '+' : ''}${mockPercent.toFixed(2)}%`,
-                isPositive: mockPercent >= 0,
-                history: [defaultUSD * 0.97, defaultUSD * 1.01, calculatedPrice]
+                name: officialCompanyName,
+                price: currentPrice.toFixed(2),
+                change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
+                isPositive: (currentPrice - previousClose) >= 0,
+                history: historyPrices
+              };
+            } catch (e) {
+              // Safe individual position level catch block isolation fallback
+              const baseMap = { 'AAPL': 182.30, 'TSLA': 214.80, 'NVDA': 122.15 };
+              const defaultPrice = baseMap[stock.symbol] || 100.00;
+              return {
+                ...stock,
+                price: defaultPrice.toFixed(2),
+                history: [defaultPrice, defaultPrice]
               };
             }
           })
         );
-        
         setStocks(updatedStocks);
         setLoading(false);
       } catch (err) {
-        console.error("Aggregation exception:", err.message);
+        console.error("Stocks loop tracking exception:", err.message);
         setLoading(false);
       }
     }
@@ -109,7 +107,6 @@ export default function App() {
     return () => clearInterval(interval);
   }, [stocks.length]);
 
-
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
   }, [stocks]);
@@ -117,6 +114,7 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('app_theme_mode', theme);
   }, [theme]);
+
 
 
   const totalNetWorthUSD = stocks.reduce((acc, s) => acc + (parseFloat(s.price || 0) * parseFloat(s.shares || 0)), 0);
