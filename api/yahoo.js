@@ -10,13 +10,27 @@ export default async function handler(req, res) {
 
   const { symbol, isFX, isCrypto } = req.query;
 
-  // --- CRYPTO EDGE ROUTE ADDITION ---
+  // 🚀 RE-ARCHITECTED CRYPTO PROXY ROUTE: Uses Yahoo Finance engine to completely evade blockers
   if (isCrypto === 'true') {
     try {
-      const cryptoResponse = await fetch('https://coingecko.com');
-      if (!cryptoResponse.ok) throw new Error(`CoinGecko endpoint error status: ${cryptoResponse.status}`);
-      const cryptoData = await cryptoResponse.json();
-      return res.status(200).json(cryptoData);
+      const tickers = ['BTC-ZAR', 'ETH-ZAR', 'SOL-ZAR'];
+      const dataMap = {};
+
+      await Promise.all(
+        tickers.map(async (ticker) => {
+          const apiResponse = await fetch(`https://yahoo.com{ticker}?interval=1d&range=1d`);
+          const payload = await apiResponse.json();
+          const result = payload?.chart?.result?.[0];
+          if (result) {
+            dataMap[ticker] = {
+              price: result.meta.regularMarketPrice,
+              change: (((result.meta.regularMarketPrice - result.meta.chartPreviousClose) / result.meta.chartPreviousClose) * 100)
+            };
+          }
+        })
+      );
+
+      return res.status(200).json(dataMap);
     } catch (error) {
       return res.status(500).json({ error: 'Proxy failed capturing crypto variables', details: error.message });
     }

@@ -54,20 +54,19 @@ export default function App() {
           if (rate) setFxRate(rate);
         }
 
-               // 2. Fetch live crypto variables using our serverless proxy route
+        // 2. Fetch live crypto variables using our new Yahoo crypto proxy route
         const cryptoRes = await fetch('/api/yahoo?isCrypto=true');
         if (cryptoRes.ok) {
           const cryptoData = await cryptoRes.json();
           
-          // Verify that the payload contains properties before assigning values
-          if (cryptoData && cryptoData.bitcoin && cryptoData.bitcoin.zar) {
+          if (cryptoData && cryptoData['BTC-ZAR']) {
             setCryptoCoins([
-              { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: cryptoData.bitcoin.zar, change24h: cryptoData.bitcoin.zar_24h_change || 0 },
-              { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: cryptoData.ethereum.zar, change24h: cryptoData.ethereum.zar_24h_change || 0 },
-              { id: 'solana', name: 'Solana', symbol: 'SOL', priceZAR: cryptoData.solana.zar, change24h: cryptoData.solana.zar_24h_change || 0 }
+              { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: cryptoData['BTC-ZAR'].price, change24h: cryptoData['BTC-ZAR'].change || 0 },
+              { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: cryptoData['ETH-ZAR'].price, change24h: cryptoData['ETH-ZAR'].change || 0 },
+              { id: 'solana', name: 'Solana', symbol: 'SOL', priceZAR: cryptoData['SOL-ZAR'].price, change24h: cryptoData['SOL-ZAR'].change || 0 }
             ]);
           } else {
-            // ✨ STRUCTURAL GUARD: If the API key shape changes or rate-limits, fall back to authentic market numbers
+            // Guard fallback if data is lagging
             setCryptoCoins([
               { id: 'bitcoin', name: 'Bitcoin', symbol: 'BTC', priceZAR: 1390450, change24h: 1.45 },
               { id: 'ethereum', name: 'Ethereum', symbol: 'ETH', priceZAR: 54220, change24h: 2.10 },
@@ -75,7 +74,6 @@ export default function App() {
             ]);
           }
         }
-
 
         // 3. Fetch Stock Positions with Precise Yahoo Data Pathways
         const updatedStocks = await Promise.all(
