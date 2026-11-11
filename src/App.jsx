@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import StockRow from './components/StockRow';
 import PortfolioHistoryChart from './components/PortfolioHistoryChart';
 import LoadingSpinner from './components/LoadingSpinner';
+import PortfolioBetaBlock from './components/PortfolioBetaBlock';
+
 
 const DEFAULT_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.', shares: '7', price: '180.50', change: '-1.72%', isPositive: false, history: [182, 181, 183, 179, 180.50] },
@@ -189,6 +191,9 @@ export default function App() {
             <span className="text-xs text-semantic-text-body">1 USD = R {fxRate.toFixed(2)}</span>
           </div>
         </div>
+
+        {/* 📊 Portfolio Volatility Beta Block */}
+        <PortfolioBetaBlock stocks={stocks} />
 
         <form onSubmit={handleAddStock} className="p-4 rounded-lg bg-semantic-surface-secondary border border-semantic-surface-primary/30 flex gap-2">
           <input type="text" placeholder="Ticker" value={inputSymbol} onChange={e => setInputSymbol(e.target.value)} className="w-1/2 p-2 rounded bg-semantic-surface-primary text-semantic-text-display border border-transparent focus:border-semantic-stock-up/50 outline-none transition-all duration-200 hover:border-semantic-text-body/30 focus:border-semantic-stock-up focus:ring-2 focus:ring-semantic-stock-up/20" />
