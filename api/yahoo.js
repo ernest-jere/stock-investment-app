@@ -8,8 +8,21 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
-  const { symbol, isFX } = req.query;
+  const { symbol, isFX, isCrypto } = req.query;
 
+  // --- CRYPTO EDGE ROUTE ADDITION ---
+  if (isCrypto === 'true') {
+    try {
+      const cryptoResponse = await fetch('https://coingecko.com');
+      if (!cryptoResponse.ok) throw new Error(`CoinGecko endpoint error status: ${cryptoResponse.status}`);
+      const cryptoData = await cryptoResponse.json();
+      return res.status(200).json(cryptoData);
+    } catch (error) {
+      return res.status(500).json({ error: 'Proxy failed capturing crypto variables', details: error.message });
+    }
+  }
+
+  // --- STANDARD STOCK ROUTES ---
   const url = isFX === 'true'
     ? 'https://yahoo.com'
     : `https://yahoo.com{symbol || 'AAPL'}?interval=1d&range=7d`;

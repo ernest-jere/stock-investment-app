@@ -55,7 +55,7 @@ export default function App() {
         }
 
         // 2. Get Live Crypto Metrics via CoinGecko
-        const cryptoRes = await fetch('https://coingecko.com');
+        const cryptoRes = await fetch('/api/yahoo?isCrypto=true');
         if (cryptoRes.ok) {
           const cryptoData = await cryptoRes.json();
           if (cryptoData) {
