@@ -16,7 +16,6 @@ export default function StockRow({ symbol, name, shares, price, change, isPositi
 
   return (
     <div className="flex items-center justify-between p-4 rounded-lg bg-semantic-surface-secondary border border-semantic-surface-primary/40 group relative">
-      // inside src/components/StockRow.jsx
     <div className="flex items-center gap-3 w-1/3">
       {/* Circle Identity Avatar Badge */}
       <div className="w-10 h-10 rounded-full bg-semantic-surface-primary flex items-center justify-center text-semantic-text-display font-bold shrink-0">
