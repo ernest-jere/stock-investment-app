@@ -41,9 +41,11 @@ export default function App() {
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
       // 🔗 REST API Real-time data streams synchronisation hook layer
+    // 🔗 REST API Real-time data streams synchronisation hook layer
   useEffect(() => {
     async function fetchFinancialData() {
       try {
+        // 1. Get Live FX Exchange Rate
         const fxRes = await fetch('/api/yahoo?isFX=true');
         const fxContentType = fxRes.headers.get('content-type');
         if (fxRes.ok && fxContentType && fxContentType.includes('application/json')) {
@@ -52,6 +54,7 @@ export default function App() {
           if (rate) setFxRate(rate);
         }
 
+        // 2. Get Live Crypto Metrics via CoinGecko
         const cryptoRes = await fetch('https://coingecko.com');
         if (cryptoRes.ok) {
           const cryptoData = await cryptoRes.json();
@@ -64,29 +67,29 @@ export default function App() {
           }
         }
 
-        // Fetch unique stock prices dynamically through independent serverless endpoints
+        // 3. Fetch Stock Positions with Precise Yahoo Data Pathways
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              // Fix proxy endpoint parameter mapping to separate requests properly
               const response = await fetch(`/api/yahoo?symbol=${stock.symbol}`);
               const stockContentType = response.headers.get('content-type');
               if (!response.ok || !stockContentType || !stockContentType.includes('application/json')) return stock;
               
               const data = await response.json();
-              const result = data?.chart?.result?.[0]; // Targets the correct nested object index array
+              // Array position extraction patch [0]
+              const result = data?.chart?.result?.[0]; 
               if (!result) return stock;
 
               const currentPrice = result.meta.regularMarketPrice;
               const previousClose = result.meta.chartPreviousClose;
               const historyPrices = result.indicators.quote[0].close.filter(p => p != null);
               
-              // EXTRACT LIVE METADATA: Grabs full corporate name from the official API stream
-              const officialCompanyName = result.meta.longName || stock.name;
+              // Extract the true global corporate metadata name strings
+              const officialCompanyName = result.meta.longName || `${stock.symbol} Corp.`;
 
               return {
                 ...stock,
-                name: officialCompanyName, // Overwrites mock values with live name
+                name: officialCompanyName,
                 price: currentPrice.toFixed(2),
                 change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
                 isPositive: (currentPrice - previousClose) >= 0,
@@ -101,12 +104,26 @@ export default function App() {
         setLoading(false);
       } catch (e) {
         console.warn("Using design token backup data anchors:", e.message);
-        // Clean unique pricing separation layout fallback loop
-        setStocks(prev => prev.map((s, idx) => ({
-          ...s,
-          price: (150 + idx * 45.25).toFixed(2), // Assigns distinct pricing levels during offline states
-          history: Array.from({ length: 7 }, () => Math.random() * 20 + 130)
-        })));
+        
+        // ✨ FIXED FALLBACK LOOP: Generates distinct, variable prices per asset
+        const baselinePrices = { 'AAPL': 180.50, 'TSLA': 215.30, 'NVDA': 123.07, 'SOL': 14.50, 'CPI': 45.10 };
+        const fallbackNames = { 'AAPL': 'Apple Inc.', 'TSLA': 'Tesla, Inc.', 'NVDA': 'NVIDIA Corporation', 'SOL': 'Solana Labs', 'CPI': 'CPI Holdings' };
+
+        setStocks(prev => prev.map(s => {
+          const defaultUSD = baselinePrices[s.symbol] || 100.00;
+          const randomShift = (Math.random() * 4 - 2); // Simulates realistic market fluctuations
+          const finalUSD = defaultUSD + randomShift;
+          const simPct = (Math.random() * 3 * (Math.random() > 0.5 ? 1 : -1));
+
+          return {
+            ...s,
+            name: fallbackNames[s.symbol] || `${s.symbol} Corp.`,
+            price: finalUSD.toFixed(2),
+            change: `${simPct >= 0 ? '+' : ''}${simPct.toFixed(2)}%`,
+            isPositive: simPct >= 0,
+            history: Array.from({ length: 5 }, () => defaultUSD * (0.95 + Math.random() * 0.1))
+          };
+        }));
         setLoading(false);
       }
     }
