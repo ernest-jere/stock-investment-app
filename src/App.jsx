@@ -30,7 +30,7 @@ export default function App() {
   
   // 🔗 Official Direct CORS-Enabled Fetch Loop (Finnhub + Open ER-API)
   useEffect(() => {
-    const FINNHUB_KEY = 'dbqa7u9r01qn88eeq1o0dbqa7u9r01qn88eeq1og';
+    const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_KEY;
 
     async function fetchFinancialData() {
       // 1. Fetch live USD to ZAR Exchange Rate directly
