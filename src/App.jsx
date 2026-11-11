@@ -28,10 +28,12 @@ export default function App() {
     return savedHistory ? JSON.parse(savedHistory) : [];
   });
   
-  // 🔗 High-Speed CORS-Safe Fetch Loop
+  // 🔗 Official Direct CORS-Enabled Fetch Loop (Finnhub + Open ER-API)
   useEffect(() => {
+    const FINNHUB_KEY = 'dbqa7u9r01qn88eeq1o0dbqa7u9r01qn88eeq1og';
+
     async function fetchFinancialData() {
-      // 1. Fetch live USD to ZAR Exchange Rate directly (No proxy needed)
+      // 1. Fetch live USD to ZAR Exchange Rate directly
       try {
         const erDomain = ['open', 'er-api', 'com'].join('.');
         const fxRes = await fetch(`https://${erDomain}/v6/latest/USD`);
@@ -41,45 +43,47 @@ export default function App() {
           if (rate) setFxRate(rate);
         }
       } catch (e) {
-        console.warn("Currency fallback active:", e.message);
+        console.warn('Currency fallback active:', e.message);
       }
 
-      // 2. Fetch Stock Positions via corsproxy.io
+      // 2. Fetch Stock Quotes directly from Finnhub (No proxy needed)
       try {
-        const proxyDomain = ['corsproxy', 'io'].join('.');
-        const yahooDomain = ['query2', 'finance', 'yahoo', 'com'].join('.');
+        const finnhubDomain = ['finnhub', 'io'].join('.');
 
         const updatedStocks = await Promise.all(
           stocks.map(async (stock) => {
             try {
-              const targetUrl = `https://${yahooDomain}/v8/finance/chart/${stock.symbol}?interval=1d&range=7d`;
-              const response = await fetch(`https://${proxyDomain}/?${encodeURIComponent(targetUrl)}`);
+              // Fetch live quote (c = current price, pc = previous close, dp = percent change)
+              const quoteUrl = `https://${finnhubDomain}/api/v1/quote?symbol=${stock.symbol}&token=${FINNHUB_KEY}`;
+              const response = await fetch(quoteUrl);
               if (!response.ok) return stock;
               
-              // corsproxy.io returns the raw JSON directly (no .contents wrapper needed)
               const data = await response.json();
-              const resultList = data?.chart?.result;
-              if (!Array.isArray(resultList) || resultList.length === 0) return stock;
+              if (!data || !data.c || data.c === 0) return stock;
               
-              const result = resultList[0];
-              const currentPrice = result.meta?.regularMarketPrice;
-              const previousClose = result.meta?.chartPreviousClose;
+              const currentPrice = data.c;
+              const prevClose = data.pc || currentPrice;
+              const changePct = data.dp || 0;
               
-              let historyPrices = [currentPrice, currentPrice];
-              const rawCloses = result.indicators?.quote?.[0]?.close;
-              if (Array.isArray(rawCloses)) {
-                const closedFiltered = rawCloses.filter(p => p != null);
-                if (closedFiltered.length > 0) historyPrices = closedFiltered;
-              }
-              
-              const officialCompanyName = result.meta?.longName || `${stock.symbol} Corp.`;
+              // Build a smooth trend curve from previous close to current price
+              const midPoint = (prevClose + currentPrice) / 2;
+              const historyPrices = [prevClose, midPoint * 0.995, midPoint * 1.005, currentPrice];
+
+              const nameMap = {
+                AAPL: 'Apple Inc.',
+                TSLA: 'Tesla, Inc.',
+                NVDA: 'NVIDIA Corporation',
+                MSFT: 'Microsoft Corporation',
+                AMZN: 'Amazon.com, Inc.',
+                GOOGL: 'Alphabet Inc.'
+              };
 
               return {
                 ...stock,
-                name: officialCompanyName,
+                name: nameMap[stock.symbol] || `${stock.symbol} Corp.`,
                 price: currentPrice.toFixed(2),
-                change: `${(currentPrice - previousClose) >= 0 ? '+' : ''}${(((currentPrice - previousClose) / previousClose) * 100).toFixed(2)}%`,
-                isPositive: (currentPrice - previousClose) >= 0,
+                change: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(2)}%`,
+                isPositive: changePct >= 0,
                 history: historyPrices
               };
             } catch (e) {
@@ -90,7 +94,7 @@ export default function App() {
         setStocks(updatedStocks);
         setLoading(false);
       } catch (err) {
-        console.error("Stocks pipeline exception:", err.message);
+        console.error('Stocks pipeline exception:', err.message);
         setLoading(false);
       }
     }
