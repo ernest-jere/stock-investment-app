@@ -38,6 +38,23 @@ export default function App() {
   const [inputSymbol, setInputSymbol] = useState('');
   const [inputShares, setInputShares] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState(() =>
+    new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+  );
+
+  // Helper to check if NYSE is currently open (9:30 AM - 4:00 PM New York time, Mon-Fri)
+  const checkNyseOpen = () => {
+    const nyTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
+    const day = nyTime.getDay();
+    const totalMinutes = nyTime.getHours() * 60 + nyTime.getMinutes();
+    const isWeekday = day >= 1 && day <= 5;
+    const isMarketHours = totalMinutes >= 9 * 60 + 30 && totalMinutes < 16 * 60;
+    return isWeekday && isMarketHours;
+  };
+
+  const [isMarketOpen, setIsMarketOpen] = useState(checkNyseOpen);
+
 
   const [netWorthHistory, setNetWorthHistory] = useState(() => {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
@@ -72,39 +89,46 @@ export default function App() {
       return null;
     }
   };
+ 
+    const syncMarketData = async () => {
+    setIsRefreshing(true);
+    setIsMarketOpen(checkNyseOpen());
 
-  // 1. Initial & 60-second background sync (Runs without infinite loops)
-  useEffect(() => {
-    async function syncMarketData() {
-      try {
-        const erDomain = ['open', 'er-api', 'com'].join('.');
-        const fxRes = await fetch(`https://${erDomain}/v6/latest/USD`);
-        if (fxRes.ok) {
-          const fxData = await fxRes.json();
-          if (fxData?.rates?.ZAR) setFxRate(fxData.rates.ZAR);
-        }
-      } catch (e) {
-        console.warn('FX fallback active:', e.message);
+    try {
+      const erDomain = ['open', 'er-api', 'com'].join('.');
+      const fxRes = await fetch(`https://${erDomain}/v6/latest/USD`);
+      if (fxRes.ok) {
+        const fxData = await fxRes.json();
+        if (fxData?.rates?.ZAR) setFxRate(fxData.rates.ZAR);
       }
-
-      setStocks((currentStocks) => {
-        Promise.all(
-          currentStocks.map(async (stock) => {
-            const live = await fetchSingleQuote(stock.symbol);
-            return live ? { ...stock, ...live } : stock;
-          })
-        ).then((updated) => {
-          setStocks(updated);
-          setLoading(false);
-        });
-        return currentStocks;
-      });
+    } catch (e) {
+      console.warn('FX fallback active:', e.message);
     }
 
+    setStocks((currentStocks) => {
+      Promise.all(
+        currentStocks.map(async (stock) => {
+          const live = await fetchSingleQuote(stock.symbol);
+          return live ? { ...stock, ...live } : stock;
+        })
+      ).then((updated) => {
+        setStocks(updated);
+        setLoading(false);
+        setIsRefreshing(false);
+        setLastUpdated(
+          new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+        );
+      });
+      return currentStocks;
+    });
+  };
+
+  useEffect(() => {
     syncMarketData();
     const interval = setInterval(syncMarketData, 60000);
     return () => clearInterval(interval);
   }, []);
+
     // 2. Persist portfolio and theme settings
   useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
@@ -215,39 +239,50 @@ export default function App() {
       }`}
     >
       <div className="w-full max-w-lg space-y-6">
-        {/* Top Navigation */}
-        <div className="flex justify-between items-center mb-2 gap-2">
-          <h1 className="text-xl font-bold tracking-tight">InvestTrack</h1>
+                {/* Top Navigation with Live Market Status Badge & Refresh Button */}
+        <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
+          <div className="flex items-center gap-2.5">
+            <h1 className="text-xl font-bold tracking-tight">InvestTrack</h1>
+            <span
+              className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
+                isMarketOpen
+                  ? 'bg-semantic-stock-up/15 text-semantic-stock-up'
+                  : 'bg-semantic-surface-primary text-semantic-text-body'
+              }`}
+            >
+              <span
+                className={`w-1.5 h-1.5 rounded-full ${
+                  isMarketOpen ? 'bg-semantic-stock-up animate-pulse' : 'bg-semantic-text-body'
+                }`}
+              />
+              {isMarketOpen ? 'NYSE Open' : 'NYSE Closed'}
+            </span>
+          </div>
+
           <div className="flex gap-2">
+            <button
+              onClick={syncMarketData}
+              disabled={isRefreshing}
+              title="Refresh live quotes"
+              className="px-3 py-1 text-xs rounded-full bg-semantic-surface-secondary border border-semantic-surface-primary text-semantic-text-display font-medium cursor-pointer hover:opacity-80 disabled:opacity-50 transition-all"
+            >
+              <span className={isRefreshing ? 'inline-block animate-spin' : 'inline-block'}>↻</span>{' '}
+              {isRefreshing ? 'Syncing' : 'Refresh'}
+            </button>
             <button
               onClick={toggleCurrency}
               className="px-3 py-1 text-xs rounded-full bg-semantic-surface-secondary border border-semantic-surface-primary text-semantic-text-display font-medium cursor-pointer"
             >
-              💵 {currency === 'ZAR' ? 'ZAR Active' : 'USD Active'}
+              💵 {currency}
             </button>
             <button
               onClick={toggleTheme}
               className="px-3 py-1 text-xs rounded-full bg-semantic-surface-secondary border border-semantic-surface-primary text-semantic-text-display font-medium cursor-pointer"
             >
-              {theme === 'dark' ? '☀️ Light' : '🌙 Dark'}
+              {theme === 'dark' ? '☀️' : '🌙'}
             </button>
           </div>
-        </div>
-
-        {/* Portfolio Net Worth Card */}
-        <div className="p-6 rounded-xl bg-semantic-surface-secondary border border-semantic-surface-primary/40 shadow-md">
-          <p className="text-xs text-semantic-text-body uppercase tracking-wider font-semibold">
-            Total Portfolio Net Worth
-          </p>
-          <h2 className="text-3xl font-bold mt-1 tracking-tight">
-            {currency === 'ZAR'
-              ? displayTotalNetWorth.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR' })
-              : displayTotalNetWorth.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-          </h2>
-
-          <PortfolioHistoryChart historyData={netWorthHistory} currency={currency} />
-
-          <div className="mt-4 flex items-center justify-between border-t border-semantic-surface-primary/30 pt-3">
+                    <div className="mt-4 flex items-center justify-between border-t border-semantic-surface-primary/30 pt-3">
             <span
               className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
                 overallPositive
@@ -257,8 +292,11 @@ export default function App() {
             >
               {overallPositive ? '▲ Portfolio Bullish' : '▼ Market Volatile'}
             </span>
-            <span className="text-xs text-semantic-text-body">1 USD = R {fxRate.toFixed(2)}</span>
+            <span className="text-xs text-semantic-text-body">
+              1 USD = R {fxRate.toFixed(2)} • Synced {lastUpdated}
+            </span>
           </div>
+
         </div>
 
         {/* Volatility Risk Indicator */}
