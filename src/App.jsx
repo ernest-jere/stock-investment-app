@@ -3,6 +3,8 @@ import StockRow from './components/StockRow';
 import PortfolioHistoryChart from './components/PortfolioHistoryChart';
 import LoadingSpinner from './components/LoadingSpinner';
 import PortfolioBetaBlock from './components/PortfolioBetaBlock';
+import SectorBreakdownBar from './components/SectorBreakdownBar';
+
 
 const DEFAULT_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.', shares: '7', price: '182.30', change: '+1.15%', isPositive: true, history: [180, 181, 182.30] },
@@ -301,6 +303,9 @@ export default function App() {
 
         {/* Volatility Risk Indicator */}
         <PortfolioBetaBlock stocks={stocks} />
+
+        {/* Sector Allocation Breakdown Bar */}
+        <SectorBreakdownBar stocks={stocks} />
 
         {/* Add Asset Form */}
         <form
