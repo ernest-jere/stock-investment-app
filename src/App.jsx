@@ -5,7 +5,6 @@ import LoadingSpinner from './components/LoadingSpinner';
 import PortfolioBetaBlock from './components/PortfolioBetaBlock';
 import SectorBreakdownBar from './components/SectorBreakdownBar';
 
-
 const DEFAULT_STOCKS = [
   { symbol: 'AAPL', name: 'Apple Inc.', shares: '7', price: '182.30', change: '+1.15%', isPositive: true, history: [180, 181, 182.30] },
   { symbol: 'TSLA', name: 'Tesla, Inc.', shares: '5', price: '214.80', change: '-0.45%', isPositive: false, history: [216, 215, 214.80] },
@@ -45,18 +44,14 @@ export default function App() {
     new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
 
-  // Helper to check if NYSE is currently open (9:30 AM - 4:00 PM New York time, Mon-Fri)
   const checkNyseOpen = () => {
     const nyTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const day = nyTime.getDay();
     const totalMinutes = nyTime.getHours() * 60 + nyTime.getMinutes();
-    const isWeekday = day >= 1 && day <= 5;
-    const isMarketHours = totalMinutes >= 9 * 60 + 30 && totalMinutes < 16 * 60;
-    return isWeekday && isMarketHours;
+    return day >= 1 && day <= 5 && totalMinutes >= 9 * 60 + 30 && totalMinutes < 16 * 60;
   };
 
   const [isMarketOpen, setIsMarketOpen] = useState(checkNyseOpen);
-
 
   const [netWorthHistory, setNetWorthHistory] = useState(() => {
     const savedHistory = localStorage.getItem('user_networth_history_ledger');
@@ -66,7 +61,6 @@ export default function App() {
   const FINNHUB_KEY = import.meta.env.VITE_FINNHUB_KEY;
   const finnhubDomain = ['finnhub', 'io'].join('.');
 
-  // Helper to fetch a single stock quote safely
   const fetchSingleQuote = async (symbol) => {
     if (!FINNHUB_KEY) return null;
     try {
@@ -91,8 +85,8 @@ export default function App() {
       return null;
     }
   };
- 
-    const syncMarketData = async () => {
+
+  const syncMarketData = async () => {
     setIsRefreshing(true);
     setIsMarketOpen(checkNyseOpen());
 
@@ -130,9 +124,7 @@ export default function App() {
     const interval = setInterval(syncMarketData, 60000);
     return () => clearInterval(interval);
   }, []);
-
-    // 2. Persist portfolio and theme settings
-  useEffect(() => {
+    useEffect(() => {
     localStorage.setItem('user_portfolio_manifest', JSON.stringify(stocks));
   }, [stocks]);
 
@@ -140,7 +132,6 @@ export default function App() {
     localStorage.setItem('app_theme_mode', theme);
   }, [theme]);
 
-  // 3. Portfolio math and immutable history ledger
   const totalNetWorthUSD = stocks.reduce(
     (acc, s) => acc + parseFloat(s.price || 0) * parseFloat(s.shares || 0),
     0
@@ -166,7 +157,6 @@ export default function App() {
     });
   }, [displayTotalNetWorth, currency]);
 
-  // 4. User interaction handlers
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
   const toggleCurrency = () => setCurrency((prev) => (prev === 'ZAR' ? 'USD' : 'ZAR'));
 
@@ -200,7 +190,7 @@ export default function App() {
       price: '100.00',
       change: '0.00%',
       isPositive: true,
-      history: [100, 100]
+      history: []
     };
 
     setStocks((prev) => {
@@ -230,11 +220,6 @@ export default function App() {
     setStocks((prev) => prev.filter((s) => s.symbol !== sym));
   };
 
-  if (loading && stocks.every((s) => s.price === '0.00')) {
-    return <LoadingSpinner fullScreen={true} />;
-  }
-
-    // Export active portfolio ledger to a downloadable CSV spreadsheet
   const handleExportCSV = () => {
     if (stocks.length === 0) return;
 
@@ -266,14 +251,17 @@ export default function App() {
     URL.revokeObjectURL(url);
   };
 
-  return (
+  if (loading && stocks.every((s) => s.price === '0.00')) {
+    return <LoadingSpinner fullScreen={true} />;
+  }
+    return (
     <div
       className={`min-h-screen bg-semantic-app-bg p-6 flex flex-col items-center font-portfolio text-semantic-text-display transition-colors duration-200 ${
         theme === 'light' ? 'light-theme' : ''
       }`}
     >
       <div className="w-full max-w-lg space-y-6">
-                {/* Top Navigation with Live Market Status Badge & Refresh Button */}
+        {/* Top Navigation */}
         <div className="flex flex-wrap justify-between items-center mb-2 gap-2">
           <div className="flex items-center gap-2.5">
             <h1 className="text-xl font-bold tracking-tight">InvestTrack</h1>
@@ -316,7 +304,22 @@ export default function App() {
               {theme === 'dark' ? '☀️' : '🌙'}
             </button>
           </div>
-                    <div className="mt-4 flex items-center justify-between border-t border-semantic-surface-primary/30 pt-3">
+        </div>
+
+        {/* Portfolio Net Worth Card + 7-Day Rolling Chart */}
+        <div className="p-6 rounded-xl bg-semantic-surface-secondary border border-semantic-surface-primary/40 shadow-md">
+          <p className="text-xs text-semantic-text-body uppercase tracking-wider font-semibold">
+            Total Portfolio Net Worth
+          </p>
+          <h2 className="text-3xl font-bold mt-1 tracking-tight">
+            {currency === 'ZAR'
+              ? displayTotalNetWorth.toLocaleString('en-ZA', { style: 'currency', currency: 'ZAR' })
+              : displayTotalNetWorth.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+          </h2>
+
+          <PortfolioHistoryChart historyData={netWorthHistory} currency={currency} />
+
+          <div className="mt-4 flex items-center justify-between border-t border-semantic-surface-primary/30 pt-3">
             <span
               className={`inline-block px-2 py-0.5 rounded text-xs font-bold ${
                 overallPositive
@@ -330,7 +333,6 @@ export default function App() {
               1 USD = R {fxRate.toFixed(2)} • Synced {lastUpdated}
             </span>
           </div>
-
         </div>
 
         {/* Volatility Risk Indicator */}
@@ -367,10 +369,7 @@ export default function App() {
           </button>
         </form>
 
-        {/* Active Positions List */}
-        <div className="space-y-3">
-          <h3 className="text-xs font-bold text-semantic-text-body px-1 uppercase tracking-wider">
-                    {/* Active Positions List with CSV Export Button */}
+        {/* Active Positions List with CSV Export Button */}
         <div className="space-y-3">
           <div className="flex justify-between items-center px-1">
             <h3 className="text-xs font-bold text-semantic-text-body uppercase tracking-wider">
@@ -394,20 +393,7 @@ export default function App() {
             />
           ))}
         </div>
-
-          </h3>
-          {stocks.map((stock) => (
-            <StockRow
-              key={stock.symbol}
-              {...stock}
-              currency={currency}
-              fxRate={fxRate}
-              onRemove={handleRemoveStock}
-            />
-          ))}
-        </div>
       </div>
     </div>
   );
 }
-
