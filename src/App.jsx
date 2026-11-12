@@ -234,6 +234,38 @@ export default function App() {
     return <LoadingSpinner fullScreen={true} />;
   }
 
+    // Export active portfolio ledger to a downloadable CSV spreadsheet
+  const handleExportCSV = () => {
+    if (stocks.length === 0) return;
+
+    const headers = ['Ticker', 'Company Name', 'Shares', `Price (${currency})`, `Total Value (${currency})`, '24h Change'];
+    const rows = stocks.map((stock) => {
+      const unitPrice = currency === 'ZAR' ? parseFloat(stock.price) * fxRate : parseFloat(stock.price);
+      const totalValue = unitPrice * parseFloat(stock.shares);
+      return [
+        stock.symbol,
+        `"${stock.name.replace(/"/g, '""')}"`,
+        stock.shares,
+        unitPrice.toFixed(2),
+        totalValue.toFixed(2),
+        stock.change
+      ].join(',');
+    });
+
+    const csvContent = [headers.join(','), ...rows].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement('a');
+    const dateStamp = new Date().toISOString().split('T')[0];
+    link.href = url;
+    link.setAttribute('download', `InvestTrack_Portfolio_${currency}_${dateStamp}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <div
       className={`min-h-screen bg-semantic-app-bg p-6 flex flex-col items-center font-portfolio text-semantic-text-display transition-colors duration-200 ${
@@ -338,7 +370,31 @@ export default function App() {
         {/* Active Positions List */}
         <div className="space-y-3">
           <h3 className="text-xs font-bold text-semantic-text-body px-1 uppercase tracking-wider">
-            Active Asset Positions
+                    {/* Active Positions List with CSV Export Button */}
+        <div className="space-y-3">
+          <div className="flex justify-between items-center px-1">
+            <h3 className="text-xs font-bold text-semantic-text-body uppercase tracking-wider">
+              Active Asset Positions
+            </h3>
+            <button
+              onClick={handleExportCSV}
+              title="Download portfolio ledger as CSV"
+              className="px-2.5 py-1 text-[11px] rounded-md bg-semantic-surface-secondary border border-semantic-surface-primary text-semantic-text-display font-semibold cursor-pointer hover:border-semantic-stock-up/50 active:scale-[0.97] transition-all"
+            >
+              ⬇ Export CSV
+            </button>
+          </div>
+          {stocks.map((stock) => (
+            <StockRow
+              key={stock.symbol}
+              {...stock}
+              currency={currency}
+              fxRate={fxRate}
+              onRemove={handleRemoveStock}
+            />
+          ))}
+        </div>
+
           </h3>
           {stocks.map((stock) => (
             <StockRow
