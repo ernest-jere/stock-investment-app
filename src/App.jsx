@@ -44,6 +44,13 @@ export default function App() {
     new Date().toLocaleTimeString('en-ZA', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
   );
 
+    const trackEvent = (eventName, params = {}) => {
+    if (typeof window.gtag === 'function') {
+      window.gtag('event', eventName, params);
+    }
+  };
+
+
   const checkNyseOpen = () => {
     const nyTime = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/New_York' }));
     const day = nyTime.getDay();
@@ -158,7 +165,10 @@ export default function App() {
   }, [displayTotalNetWorth, currency]);
 
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
-  const toggleCurrency = () => setCurrency((prev) => (prev === 'ZAR' ? 'USD' : 'ZAR'));
+  const toggleCurrency = () => {
+    setCurrency((prev) => (prev === 'ZAR' ? 'USD' : 'ZAR'))
+    trackEvent('switch_currency', { to: currency === 'ZAR' ? 'USD' : 'ZAR' });
+  };
 
   const handleAddStock = async (e) => {
     e.preventDefault();
@@ -214,6 +224,7 @@ export default function App() {
         }
       ];
     });
+    trackEvent('add_stock', { ticker: symbolUpper, shares: sharesToAdd });
   };
 
   const handleRemoveStock = (sym) => {
@@ -246,6 +257,7 @@ export default function App() {
     link.href = url;
     link.setAttribute('download', `InvestTrack_Portfolio_${currency}_${dateStamp}.csv`);
     document.body.appendChild(link);
+    trackEvent('export_csv', { currency, asset_count: stocks.length });
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
